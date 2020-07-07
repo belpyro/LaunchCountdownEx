@@ -15,7 +15,9 @@ namespace NASA_CountDown.States
         private AudioSource _audioSource;
         private List<Action> _stages;
 
-        public LaunchState(string name, KerbalFsmEx machine) : base(name, machine) { }
+        public LaunchState(string name, KerbalFsmEx machine) : base(name, machine)
+        {
+        }
 
         protected override void OnEnterToState(KFSMState kfsmState)
         {
@@ -27,12 +29,15 @@ namespace NASA_CountDown.States
 
             if (ConfigInfo.Instance.EngineControl)
             {
-                FlightGlobals.ActiveVessel.OnFlyByWire = (FlightInputCallback)Delegate.Combine(FlightGlobals.ActiveVessel.OnFlyByWire, (FlightInputCallback)OnFlyByWire);
+                FlightGlobals.ActiveVessel.OnFlyByWire =
+                    (FlightInputCallback) Delegate.Combine(FlightGlobals.ActiveVessel.OnFlyByWire,
+                        (FlightInputCallback) OnFlyByWire);
             }
 
             GameEvents.onVesselSituationChange.Add(SituationChanged);
 
-            _stages = ConfigInfo.Instance.Sequences[FlightGlobals.ActiveVessel.id].Select(x => x < 0 ? new Action(() => { }) : new Action(() => StageManager.ActivateStage(x))).ToList();
+            _stages = ConfigInfo.Instance.Sequences[FlightGlobals.ActiveVessel.id].Select(x =>
+                x < 0 ? new Action(() => { }) : new Action(() => StageManager.ActivateStage(x))).ToList();
 
             _dummy.StartCoroutine(this.TickLaunch());
         }
@@ -40,7 +45,9 @@ namespace NASA_CountDown.States
         protected override void OnLeaveFromState(KFSMState kfsmState)
         {
             base.OnLeaveFromState(kfsmState);
-            FlightGlobals.ActiveVessel.OnFlyByWire = (FlightInputCallback)Delegate.Remove(FlightGlobals.ActiveVessel.OnFlyByWire, (FlightInputCallback)OnFlyByWire);
+            FlightGlobals.ActiveVessel.OnFlyByWire =
+                (FlightInputCallback) Delegate.Remove(FlightGlobals.ActiveVessel.OnFlyByWire,
+                    (FlightInputCallback) OnFlyByWire);
             GameEvents.onVesselSituationChange.Remove(SituationChanged);
         }
 
@@ -49,7 +56,8 @@ namespace NASA_CountDown.States
             var buttonWidth = StyleFactory.ButtonLaunchStyle.fixedWidth;
             var buttonHeight = StyleFactory.ButtonLaunchStyle.fixedHeight;
 
-            if (GUI.Button(new Rect(_windowRect.xMin, _windowRect.yMax - _delta, buttonWidth, buttonHeight), string.Empty, StyleFactory.ButtonAbortStyle))
+            if (GUI.Button(new Rect(_windowRect.xMin, _windowRect.yMax - _delta, buttonWidth, buttonHeight),
+                string.Empty, StyleFactory.ButtonAbortStyle))
             {
                 _dummy.StopAllCoroutines();
                 _dummy.StartCoroutine(Abort());
@@ -69,7 +77,8 @@ namespace NASA_CountDown.States
 
             if (ConfigInfo.Instance.AbortExecuted)
             {
-                BaseAction.FireAction(FlightGlobals.ActiveVessel.Parts, KSPActionGroup.Abort, KSPActionType.Activate);
+                BaseAction.FireAction(FlightGlobals.ActiveVessel.Parts, KSPActionGroup.Abort, 0,
+                    KSPActionType.Activate);
             }
 
             Machine.RunEvent("Init");
@@ -77,13 +86,16 @@ namespace NASA_CountDown.States
 
         private IEnumerator TickLaunch()
         {
-            var count = ConfigInfo.Instance.IsSoundEnabled && ConfigInfo.Instance.CurrentAudio.TimerSounds.Any() ? ConfigInfo.Instance.CurrentAudio.TimerSounds.Count - 1 : 15;
+            var count = ConfigInfo.Instance.IsSoundEnabled && ConfigInfo.Instance.CurrentAudio.TimerSounds.Any()
+                ? ConfigInfo.Instance.CurrentAudio.TimerSounds.Count - 1
+                : 15;
 
             for (var i = count; i >= 0; i--)
             {
                 _tick = i;
 
-                _audioSource.PlayOneShot(ConfigInfo.Instance.CurrentAudio.TimerSounds.FirstOrDefault(x => x.name.EndsWith($"/{i}")));
+                _audioSource.PlayOneShot(
+                    ConfigInfo.Instance.CurrentAudio.TimerSounds.FirstOrDefault(x => x.name.EndsWith($"/{i}")));
 
                 if (_stages.Count > i)
                 {

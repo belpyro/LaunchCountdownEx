@@ -1,12 +1,9 @@
 ﻿using System;
 using System.Linq;
-using KSP.UI;
-using KSP.UI.Screens;
 using NASA_CountDown.Config;
 using NASA_CountDown.Helpers;
 using NASA_CountDown.StateMachine;
 using UnityEngine;
-using UnityEngine.EventSystems;
 
 namespace NASA_CountDown.States
 {
@@ -25,29 +22,34 @@ namespace NASA_CountDown.States
                     ConfigInfo.Instance.Sequences.Add(FlightGlobals.ActiveVessel.id, Enumerable.Repeat(-1, 10).ToArray());
                 }
 
-                StageManager.Instance.Stages.ForEach(@group => group.Icons.ForEach(icon => icon.radioButton.onClick.AddListener(OnClickButton)));
+                // StageManager.Instance.Stages.ForEach(@group => group.Icons.ForEach(icon => icon.radioButton.onClick.AddListener(OnClickButton)));
             };
 
             OnLeave = state =>
             {
-                StageManager.Instance.Stages.ForEach(@group => group.Icons.ForEach(icon => icon.radioButton.onClick.RemoveListener(OnClickButton)));
+                // StageManager.Instance.Stages.ForEach(@group => group.Icons.ForEach(icon => icon.radioButton.onClick.RemoveListener(OnClickButton)));
             };
 
             updateMode = KFSMUpdateMode.MANUAL_TRIGGER;
         }
 
-        private void OnClickButton(PointerEventData arg0, UIRadioButton.State arg1, UIRadioButton.CallType arg2)
-        {
-            if (!_isEditorState) return;
+        // private void OnClickButton(PointerEventData arg0, UIRadioButton.State arg1, UIRadioButton.CallType arg2)
+        // {
+        //     throw new NotImplementedException();
+        // }
 
-            var stage = arg0.pointerPress.GetComponentInParent<StageGroup>();
-
-            if (stage != null)
-            {
-                ConfigInfo.Instance.Sequences[FlightGlobals.ActiveVessel.id][_stageIndex] = stage.inverseStageIndex;
-                _isEditorState = false;
-            }
-        }
+        // private void OnClickButton(PointerEventData arg0, UIRadioButton.State arg1, UIRadioButton.CallType arg2)
+        // {
+        //     if (!_isEditorState) return;
+        //
+        //     var stage = arg0.pointerPress.GetComponentInParent<StageGroup>();
+        //
+        //     if (stage != null)
+        //     {
+        //         ConfigInfo.Instance.Sequences[FlightGlobals.ActiveVessel.id][_stageIndex] = stage.inverseStageIndex;
+        //         _isEditorState = false;
+        //     }
+        // }
 
         protected override void OnGui()
         {
