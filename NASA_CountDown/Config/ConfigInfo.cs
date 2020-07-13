@@ -1,18 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using NASA_CountDown.Extensions;
 using NASA_CountDown.Helpers;
+using NASA_CountDown.Loaders;
 using UnityEngine;
 
 namespace NASA_CountDown.Config
 {
-    class ConfigInfo: IConfigNode
+    class ConfigInfo : IConfigNode
     {
-        private readonly RectWrapper _wrapper = new RectWrapper();
-
         private static ConfigInfo _config;
-
-        private ConfigInfo(){}
+        private float _scale = 1;
 
         internal bool IsSoundEnabled { get; set; }
 
@@ -26,7 +26,15 @@ namespace NASA_CountDown.Config
 
         internal bool AbortExecuted { get; set; } = true;
 
-        internal float Scale { get; set; } = 1;
+        internal float Scale
+        {
+            get => _scale;
+            set
+            {
+                _scale = value;
+                BundleLoader.Instance.Reload(value);
+            }
+        }
 
         internal bool IsLoaded { get; private set; }
 
@@ -36,9 +44,7 @@ namespace NASA_CountDown.Config
         {
             try
             {
-                LoadSounds();
-
-                if (node == null) throw new NullReferenceException("Node not exist");
+                if (node == null) return;
 
                 if (node.HasValue("soundEnabled"))
                 {
@@ -65,10 +71,12 @@ namespace NASA_CountDown.Config
                     SoundSet = node.GetValue("soundSet");
                 }
 
-                if (node.HasValue("position"))
+                if (node.HasNode("window"))
                 {
-                    WindowPosition = _wrapper.ToRect(node.GetValue("position"));
-                    Debug.LogWarning("Position is" + WindowPosition);
+                    var current = node.GetNode("window") ?? new ConfigNode();
+                    var position = current.GetValue("position") ?? "100";
+                    var size = current.GetValue("size") ?? "100";
+                    WindowPosition = new Rect(KSPUtil.ParseVector2(position), KSPUtil.ParseVector2(size));
                 }
 
                 if (node.HasNode("sequence"))
@@ -79,7 +87,8 @@ namespace NASA_CountDown.Config
 
                     foreach (var sequence in sequences)
                     {
-                        Sequences.Add(new Guid(sequence.GetValue("id")), sequence.GetValue("stages").Split(',').Select(int.Parse).ToArray());
+                        Sequences.Add(new Guid(sequence.GetValue("id")),
+                            sequence.GetValue("stages").Split(',').Select(int.Parse).ToArray());
                     }
                 }
 
@@ -93,30 +102,18 @@ namespace NASA_CountDown.Config
             }
         }
 
-        private void LoadSounds()
-        {
-            var soundsList =
-                GameDatabase.Instance.databaseAudio.Where(x => x.name.StartsWith("NASA_CountDown", StringComparison.OrdinalIgnoreCase))
-                    .Select(x => x.name)
-                    .ToList();
-
-            foreach (var name in soundsList.Select(x => x.Split('/')).Select(m => m[2]).Distinct())
-            {
-                AudioSets.Add(name, new AudioSet(name));
-            }
-        }
-
         public void Save(ConfigNode node)
         {
             node.AddValue("soundEnabled", IsSoundEnabled);
-            node.AddValue("soundSet", SoundSet);
+            node.TryAddValue("soundSet", SoundSet);
 
-            _wrapper.FromRect(WindowPosition);
-
-            node.AddValue("position", _wrapper);
             node.AddValue("engineControl", EngineControl);
             node.AddValue("abort", AbortExecuted);
             node.AddValue("scale", Scale);
+
+            var current = node.AddNode("window");
+            current.AddValue("position", KSPUtil.WriteVector(WindowPosition.position));
+            current.AddValue("size", KSPUtil.WriteVector(WindowPosition.size));
 
             foreach (var sequence in Sequences)
             {
@@ -126,12 +123,8 @@ namespace NASA_CountDown.Config
 
                 var value = sequence.Value.Select(x => x.ToString()).Aggregate((x, y) => $"{x},{y}");
 
-                seqNode.AddValue("stages", value);
+                seqNode.TryAddValue("stages", value);
             }
         }
-
-        public Dictionary<string, AudioSet> AudioSets { get; } = new Dictionary<string, AudioSet>();
-
-        public AudioSet CurrentAudio => AudioSets.ContainsKey(SoundSet) ? AudioSets[SoundSet] : null;
     }
 }

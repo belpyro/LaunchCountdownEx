@@ -1,51 +1,29 @@
-﻿using System;
+using System;
 using System.Collections;
 using NASA_CountDown.Config;
 using NASA_CountDown.Helpers;
-using NASA_CountDown.StateMachine;
+using NASA_CountDown.Loaders;
+using NASA_CountDown.StateMachine.Common;
 using UnityEngine;
 
-namespace NASA_CountDown.States
+namespace NASA_CountDown.StateMachine.States
 {
-    public class InitialState : BaseGuiState
+    public class InitialStateSM : MonoBehaviour
     {
         protected Rect _windowRect;
         protected int _tick = 0;
         protected float _delta;
         private bool _buttonOpened;
-        protected GameObject _obj;
 
-        protected DummyComponent _dummy;
-
-        public InitialState(string name, KerbalFsmEx machine) : base(name, machine)
+        protected virtual void Awake()
         {
-            OnEnter = OnEnterToState;
-            OnLeave = OnLeaveFromState;
-        }
-
-        protected virtual void OnLeaveFromState(KFSMState kfsmState)
-        {
-            _dummy.StopAllCoroutines();
-            _obj.DestroyGameObjectImmediate();
-        }
-
-        protected virtual void OnEnterToState(KFSMState kfsmState)
-        {
-            if (FlightGlobals.ActiveVessel.situation != Vessel.Situations.PRELAUNCH)
-            {
-                Machine.RunEvent("Finish");
-            }
-
-            _obj = new GameObject("Helper");
-            _dummy = _obj.AddComponent<DummyComponent>();
-            StyleFactory.Scale = ConfigInfo.Instance.Scale;
-            StyleFactory.Reload();
             _windowRect = ScaleRect(GUIUtil.ScreenCenteredRect(459, 120));
         }
 
-        protected override void OnGui()
+        private void OnGUI()
         {
-            _windowRect = KSPUtil.ClampRectToScreen(GUI.Window(99, _windowRect, DrawMainWindow, "", StyleFactory.MainWindowStyle));
+            _windowRect = KSPUtil.ClampRectToScreen(GUI.Window(99, _windowRect, DrawMainWindow, "",
+                BundleLoader.Instance.MainWindowStyle));
 
             ConfigInfo.Instance.WindowPosition = _windowRect;
 
@@ -56,7 +34,7 @@ namespace NASA_CountDown.States
                     var openedRect = new Rect(_windowRect.xMin, _windowRect.yMin,
                         _windowRect.width, _windowRect.height + 29);
 
-                    _dummy.StartCoroutine(
+                    this.StartCoroutine(
                         openedRect.Contains(new Vector2(Input.mousePosition.x,
                             Screen.height - Input.mousePosition.y))
                             ? ShowBottomButton()
@@ -64,7 +42,7 @@ namespace NASA_CountDown.States
                 }
                 else
                 {
-                    _dummy.StartCoroutine(
+                    this.StartCoroutine(
                         _windowRect.Contains(new Vector2(Input.mousePosition.x,
                             Screen.height - Input.mousePosition.y))
                             ? ShowBottomButton()
@@ -81,23 +59,25 @@ namespace NASA_CountDown.States
         {
             GUILayout.BeginHorizontal();
 
-            GUI.DrawTexture(ScaleRect(new Rect(13, 41, 25, 27)), StyleFactory.GetTexture("minus"));
-            GUI.DrawTexture(ScaleRect(new Rect(45, 14, 54, 77)), StyleFactory.GetTexture("Digit0"));
-            GUI.DrawTexture(ScaleRect(new Rect(98, 14, 54, 77)), StyleFactory.GetTexture("Digit0"));
+            GUI.DrawTexture(ScaleRect(new Rect(13, 41, 25, 27)), BundleLoader.Instance.GetTexture("minus"));
+            GUI.DrawTexture(ScaleRect(new Rect(45, 14, 54, 77)), BundleLoader.Instance.GetTexture("Digit0"));
+            GUI.DrawTexture(ScaleRect(new Rect(98, 14, 54, 77)), BundleLoader.Instance.GetTexture("Digit0"));
 
-            GUI.DrawTexture(ScaleRect(new Rect(166, 28, 16, 51)), StyleFactory.GetTexture("colon"));
+            GUI.DrawTexture(ScaleRect(new Rect(166, 28, 16, 51)), BundleLoader.Instance.GetTexture("colon"));
 
-            GUI.DrawTexture(ScaleRect(new Rect(190, 14, 54, 77)), StyleFactory.GetTexture("Digit0"));
-            GUI.DrawTexture(ScaleRect(new Rect(247, 14, 54, 77)), StyleFactory.GetTexture("Digit0"));
+            GUI.DrawTexture(ScaleRect(new Rect(190, 14, 54, 77)), BundleLoader.Instance.GetTexture("Digit0"));
+            GUI.DrawTexture(ScaleRect(new Rect(247, 14, 54, 77)), BundleLoader.Instance.GetTexture("Digit0"));
 
-            GUI.DrawTexture(ScaleRect(new Rect(316, 28, 16, 51)), StyleFactory.GetTexture("colon"));
+            GUI.DrawTexture(ScaleRect(new Rect(316, 28, 16, 51)), BundleLoader.Instance.GetTexture("colon"));
 
             int firstDigit = _tick / 10;
             int secondDigit = _tick % 10;
 
             //seconds
-            GUI.DrawTexture(ScaleRect(new Rect(342, 14, 54, 77)), StyleFactory.GetTexture($"Digit{firstDigit}"));
-            GUI.DrawTexture(ScaleRect(new Rect(396, 14, 54, 77)), StyleFactory.GetTexture($"Digit{secondDigit}"));
+            GUI.DrawTexture(ScaleRect(new Rect(342, 14, 54, 77)),
+                BundleLoader.Instance.GetTexture($"Digit{firstDigit}"));
+            GUI.DrawTexture(ScaleRect(new Rect(396, 14, 54, 77)),
+                BundleLoader.Instance.GetTexture($"Digit{secondDigit}"));
 
             GUILayout.EndHorizontal();
 
@@ -107,15 +87,15 @@ namespace NASA_CountDown.States
 
         protected virtual void DrawButtons()
         {
-            var buttonWidth = StyleFactory.ButtonLaunchStyle.fixedWidth;
-            var buttonHeight = StyleFactory.ButtonLaunchStyle.fixedHeight;
+            var buttonWidth = BundleLoader.Instance.ButtonLaunchStyle.fixedWidth;
+            var buttonHeight = BundleLoader.Instance.ButtonLaunchStyle.fixedHeight;
 
             //launch
             if (GUI.Button(new Rect(_windowRect.xMin, _windowRect.yMax - _delta, buttonWidth, buttonHeight),
                 string.Empty,
-                StyleFactory.ButtonLaunchStyle))
+                BundleLoader.Instance.ButtonLaunchStyle))
             {
-                Machine.RunEvent("Launch");
+                this.SendMessage("ChangeState", PluginEvents.OnLauch, SendMessageOptions.RequireReceiver);
             }
 
             //sequence
@@ -123,9 +103,10 @@ namespace NASA_CountDown.States
                 GUI.Button(
                     new Rect(_windowRect.xMin + buttonWidth, _windowRect.yMax - _delta, buttonWidth, buttonHeight),
                     string.Empty,
-                    StyleFactory.ButtonSequenceStyle))
+                    BundleLoader.Instance.ButtonSequenceStyle))
             {
-                Machine.RunEvent("Sequence");
+                // Machine.RunEvent("Sequence");
+                this.SendMessage("ChangeState", PluginEvents.OnSequence, SendMessageOptions.RequireReceiver);
             }
 
             //settings
@@ -133,9 +114,10 @@ namespace NASA_CountDown.States
                 GUI.Button(
                     new Rect(_windowRect.xMin + buttonWidth * 2, _windowRect.yMax - _delta, buttonWidth, buttonHeight),
                     string.Empty,
-                    StyleFactory.ButtonSettingsStyle))
+                    BundleLoader.Instance.ButtonSettingsStyle))
             {
-                Machine.RunEvent("Settings");
+                // Machine.RunEvent("Settings");
+                this.SendMessage("ChangeState", PluginEvents.OnSettings, SendMessageOptions.RequireReceiver);
             }
         }
 
@@ -147,7 +129,7 @@ namespace NASA_CountDown.States
                 r.yMin * factor,
                 r.width * factor,
                 r.height * factor
-               );
+            );
         }
 
         private IEnumerator ShowBottomButton()

@@ -1,45 +1,39 @@
-﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using NASA_CountDown.Config;
-using NASA_CountDown.Helpers;
-using NASA_CountDown.StateMachine;
-using UniLinq;
+using NASA_CountDown.Loaders;
+using NASA_CountDown.StateMachine.Common;
 using UnityEngine;
 
-namespace NASA_CountDown.States
+namespace NASA_CountDown.StateMachine.States
 {
-    public sealed class SettingState : BaseGuiState
+    public class SettingsStateSM : MonoBehaviour
     {
         private Rect _windowRect;
         private List<string> _soundsList;
         private int _audioSet;
-
-        public SettingState(string name, KerbalFsmEx machine) : base(name, machine)
+        
+        private void Start()
         {
             _windowRect = GUIUtil.ScreenCenteredRect(200, 290);
-            OnEnter = OnEnterToState;
+            _soundsList = BundleLoader.Instance.AudioSets.Keys.ToList();
         }
 
-        private void OnEnterToState(KFSMState kfsmState)
+        private void OnGUI()
         {
-            _soundsList = ConfigInfo.Instance.AudioSets.Keys.ToList();
-        }
-
-        protected override void OnGui()
-        {
-            _windowRect = KSPUtil.ClampRectToScreen(GUILayout.Window(99, _windowRect, DrawSettingsWindow, "", StyleFactory.SettingsStyle));
+            _windowRect = KSPUtil.ClampRectToScreen(GUILayout.Window(99, _windowRect, DrawSettingsWindow, "", BundleLoader.Instance.SettingsStyle));
             GUI.BringWindowToFront(99);
         }
-
+        
         private void DrawSettingsWindow(int id)
         {
             GUILayout.BeginVertical(GUILayout.ExpandHeight(true));
 
-            ConfigInfo.Instance.AbortExecuted = GUILayout.Toggle(ConfigInfo.Instance.AbortExecuted, "Abort execute", StyleFactory.ToggleStyle);
+            ConfigInfo.Instance.AbortExecuted = GUILayout.Toggle(ConfigInfo.Instance.AbortExecuted, "Abort execute", BundleLoader.Instance.ToggleStyle);
 
             GUILayout.BeginHorizontal();
             GUILayout.FlexibleSpace();
-            GUILayout.Label($"Scale window {ConfigInfo.Instance.Scale.ToString("0.0")}", StyleFactory.LabelStyle);
+            GUILayout.Label($"Scale window {ConfigInfo.Instance.Scale.ToString("0.0")}", BundleLoader.Instance.LabelStyle);
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
 
@@ -47,7 +41,7 @@ namespace NASA_CountDown.States
 
             GUI.enabled = _soundsList.Any();
 
-            ConfigInfo.Instance.IsSoundEnabled = _soundsList.Any() && GUILayout.Toggle(ConfigInfo.Instance.IsSoundEnabled, "Sound enabled", StyleFactory.ToggleStyle);
+            ConfigInfo.Instance.IsSoundEnabled = _soundsList.Any() && GUILayout.Toggle(ConfigInfo.Instance.IsSoundEnabled, "Sound enabled", BundleLoader.Instance.ToggleStyle);
 
             if (_soundsList.Any())
             {
@@ -56,7 +50,7 @@ namespace NASA_CountDown.States
                 GUILayout.BeginHorizontal();
                 GUILayout.FlexibleSpace();
 
-                GUILayout.Label("Sound set", StyleFactory.LabelStyle);
+                GUILayout.Label("Sound set", BundleLoader.Instance.LabelStyle);
 
                 GUILayout.FlexibleSpace();
                 GUILayout.EndHorizontal();
@@ -65,7 +59,7 @@ namespace NASA_CountDown.States
 
                 GUILayout.FlexibleSpace();
 
-                if (GUILayout.Button("", StyleFactory.ButtonSoundBackStyle))
+                if (GUILayout.Button("", BundleLoader.Instance.ButtonSoundBackStyle))
                 {
                     _audioSet = _audioSet <= 0 ? _soundsList.Count - 1 : _audioSet - 1;
                     ConfigInfo.Instance.SoundSet = _soundsList[_audioSet];
@@ -73,11 +67,11 @@ namespace NASA_CountDown.States
 
                 GUILayout.FlexibleSpace();
 
-                GUILayout.Label(ConfigInfo.Instance.SoundSet, StyleFactory.LabelStyle);
+                GUILayout.Label(ConfigInfo.Instance.SoundSet, BundleLoader.Instance.LabelStyle);
 
                 GUILayout.FlexibleSpace();
 
-                if (GUILayout.Button("", StyleFactory.ButtonSoundNextStyle))
+                if (GUILayout.Button("", BundleLoader.Instance.ButtonSoundNextStyle))
                 {
                     _audioSet = _audioSet >= _soundsList.Count - 1 ? 0 : _audioSet + 1;
                     ConfigInfo.Instance.SoundSet = _soundsList[_audioSet];
@@ -94,12 +88,12 @@ namespace NASA_CountDown.States
 
             if (
                 GUI.Button(
-                    new Rect((StyleFactory.SettingsStyle.fixedWidth - StyleFactory.ButtonBackStyle.fixedWidth) / 2,
-                        StyleFactory.SettingsStyle.fixedHeight - StyleFactory.ButtonBackStyle.fixedHeight - 10,
-                        StyleFactory.ButtonBackStyle.fixedWidth, StyleFactory.ButtonBackStyle.fixedHeight), string.Empty,
-                    StyleFactory.ButtonBackStyle))
+                    new Rect((BundleLoader.Instance.SettingsStyle.fixedWidth - BundleLoader.Instance.ButtonBackStyle.fixedWidth) / 2,
+                        BundleLoader.Instance.SettingsStyle.fixedHeight - BundleLoader.Instance.ButtonBackStyle.fixedHeight - 10,
+                        BundleLoader.Instance.ButtonBackStyle.fixedWidth, BundleLoader.Instance.ButtonBackStyle.fixedHeight), string.Empty,
+                    BundleLoader.Instance.ButtonBackStyle))
             {
-                Machine.RunEvent("Init");
+                this.SendMessage("ChangeState", PluginEvents.OnInit, SendMessageOptions.RequireReceiver);
             }
 
             GUILayout.EndVertical();

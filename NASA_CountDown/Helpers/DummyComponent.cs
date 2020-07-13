@@ -2,8 +2,7 @@
 
 namespace NASA_CountDown.Helpers
 {
-    public class DummyComponent: MonoBehaviour
+    public sealed class DummyComponent: MonoBehaviour
     {
-         
     }
 }

@@ -1,74 +1,49 @@
-﻿using KSP.UI.Screens;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Appccelerate.StateMachine;
+using Appccelerate.StateMachine.Machine;
+using KSP.UI.Screens;
 using NASA_CountDown.Config;
-using NASA_CountDown.StateMachine;
-using NASA_CountDown.States;
+using NASA_CountDown.Extensions;
+using NASA_CountDown.Helpers;
+using NASA_CountDown.Loaders;
+using NASA_CountDown.StateMachine.Common;
+using NASA_CountDown.StateMachine.Extensions;
+using NASA_CountDown.StateMachine.States;
+using UnityEngine;
+using UnityEngine.EventSystems;
 
 namespace NASA_CountDown
 {
     [KSPScenario(ScenarioCreationOptions.AddToAllGames, GameScenes.FLIGHT)]
-    public class CountDownMain : ScenarioModule
+    public class CountDownMain : ScenarioModule, IStateChange
     {
-        private KerbalFsmEx _machine;
         private ApplicationLauncherButton _button;
+        private PassiveStateMachine<PluginStates, PluginEvents> _sm;
+        private Dictionary<PluginStates, MonoBehaviour> _states = new Dictionary<PluginStates, MonoBehaviour>();
+        private GameObject _dialog1;
+        private GameObject _dialog2;
 
         public override void OnAwake()
         {
-            _machine = new KerbalFsmEx();
+            InitStates();
             InitMachine();
-            _button = ApplicationLauncher.Instance.AddModApplication(() => _machine.RunEvent("Finish"),
-                () => _machine.RunEvent("Init"), () => { }, () => { }, () => { }, () => { },
+            _button = ApplicationLauncher.Instance.AddModApplication(() => _sm.Fire(PluginEvents.OnDummy),
+                () => _sm.Fire(PluginEvents.OnInit), () => { }, () => { }, () => { }, () => { },
                 ApplicationLauncher.AppScenes.FLIGHT,
-                GameDatabase.Instance.GetTexture("NASA_CountDown/Icons/launch_icon_normal", false));
-        }
-
-        private void InitMachine()
-        {
-            var initial = new InitialState("Init", _machine);
-            var settings = new SettingState("Settings", _machine);
-            var sequence = new SequenceState("Sequence", _machine);
-            var launch = new LaunchState("Launch", _machine);
-            var launched = new LaunchedState("Launched", _machine);
-            var finish = new KFSMState("Finish");
-
-            var go2Finish = new KFSMEvent("Finish")
-            {
-                GoToStateOnEvent = finish,
-                updateMode = KFSMUpdateMode.MANUAL_TRIGGER
-            };
-
-            var go2Settings = new KFSMEvent("Settings") { GoToStateOnEvent = settings, updateMode = KFSMUpdateMode.MANUAL_TRIGGER };
-            initial.AddEvent(go2Settings);
-
-            var go2Init = new KFSMEvent("Init") { GoToStateOnEvent = initial, updateMode = KFSMUpdateMode.MANUAL_TRIGGER };
-            settings.AddEvent(go2Init);
-            sequence.AddEvent(go2Init);
-            finish.AddEvent(go2Init);
-
-            var go2Sequence = new KFSMEvent("Sequence") { GoToStateOnEvent = sequence, updateMode = KFSMUpdateMode.MANUAL_TRIGGER };
-            initial.AddEvent(go2Sequence);
-
-            var go2Launch = new KFSMEvent("Launch") { GoToStateOnEvent = launch, updateMode = KFSMUpdateMode.MANUAL_TRIGGER };
-            initial.AddEvent(go2Launch);
-            launch.AddEvent(go2Init);
-            launch.AddEvent(go2Finish);
-
-            var go2Launched = new KFSMEvent("Launched") { GoToStateOnEvent = launched, updateMode = KFSMUpdateMode.MANUAL_TRIGGER };
-            launch.AddEvent(go2Launched);
-
-            initial.AddEvent(go2Finish);
-            launched.AddEvent(go2Finish);
-
-            _machine.AddState(initial);
-            _machine.AddState(settings);
-            _machine.AddState(sequence);
-            _machine.AddState(launch);
-            _machine.AddState(finish);
+                BundleLoader.Instance.Icon);
+            var prefab =
+                BundleLoader.Instance.Bundle.LoadAsset<GameObject>("Assets/Prefabs/CanvasTest.prefab".ToLower());
+            // _dialog1 = Instantiate(prefab, this.transform, false);
+            _dialog2 = Instantiate(prefab, Vector3.zero, Quaternion.identity, transform);
         }
 
         public override void OnLoad(ConfigNode node)
         {
             ConfigInfo.Instance.Load(node);
-            _machine.StartFSM("Init");
+            _sm.Start();
         }
 
         public override void OnSave(ConfigNode node)
@@ -76,46 +51,96 @@ namespace NASA_CountDown
             ConfigInfo.Instance.Save(node);
         }
 
-        #region Unity
-
-        public void FixedUpdate()
+        public void ChangeState(PluginEvents smEvent)
         {
-            if (_machine.Started)
-            {
-                _machine.FixedUpdateFSM();
-            }
-        }
-
-        public void Update()
-        {
-            if (_machine.Started)
-            {
-                _machine.UpdateFSM();
-            }
-        }
-
-        public void LateUpdate()
-        {
-            if (_machine.Started)
-            {
-                _machine.LateUpdateFSM();
-            }
-        }
-
-        public void OnGUI()
-        {
-            if (_machine.Started)
-            {
-                _machine.GuiUpdate();
-            }
+            _sm.Fire(smEvent);
         }
 
         public void OnDestroy()
         {
-            _machine = null;
+            _sm.Stop();
+            Clear();
             ApplicationLauncher.Instance.RemoveModApplication(_button);
         }
 
-        #endregion
+        private void InitStates()
+        {
+            _states.Clear();
+            _states.Add(PluginStates.Init, gameObject.AddComponent<InitialStateSM>());
+            _states.Add(PluginStates.Settings, gameObject.AddComponent<SettingsStateSM>());
+            _states.Add(PluginStates.Sequence, gameObject.AddComponent<SequenceStateFM>());
+            _states.Add(PluginStates.Launch, gameObject.AddComponent<LaunchStateSM>());
+            _states.Add(PluginStates.Launched, gameObject.AddComponent<LaunchedStateSM>());
+
+            foreach (var component in _states.Values)
+            {
+                component.enabled = false;
+            }
+        }
+
+        private void InitMachine()
+        {
+            var builder = new StateMachineDefinitionBuilder<PluginStates, PluginEvents>();
+
+            builder.In(PluginStates.Init)
+                .ExecuteOnEntry(() => { _states[PluginStates.Init].enabled = true; })
+                .ExecuteOnExit(() => { _states[PluginStates.Init].enabled = false; })
+                .On(PluginEvents.OnSettings).Goto(PluginStates.Settings)
+                .On(PluginEvents.OnSequence).Goto(PluginStates.Sequence)
+                .On(PluginEvents.OnLauch).Goto(PluginStates.Launch)
+                .On(PluginEvents.OnDummy).Goto(PluginStates.Dummy);
+
+            builder.In(PluginStates.Dummy).ExecuteOnEntry(() =>
+            {
+                foreach (var component in _states.Values)
+                {
+                    component.enabled = false;
+                }
+            }).On(PluginEvents.OnInit).Goto(PluginStates.Init);
+
+            builder.In(PluginStates.Settings)
+                .ExecuteOnEntry(() => _states[PluginStates.Settings].enabled = true)
+                .ExecuteOnExit(() => _states[PluginStates.Settings].enabled = false)
+                .On(PluginEvents.OnInit).Goto(PluginStates.Init);
+
+            builder.In(PluginStates.Sequence).ExecuteOnEntry(() => _states[PluginStates.Sequence].enabled = true)
+                .ExecuteOnExit(() => _states[PluginStates.Sequence].enabled = false)
+                .On(PluginEvents.OnInit).Goto(PluginStates.Init);
+
+            builder.In(PluginStates.Launch).ExecuteOnEntry(() => _states[PluginStates.Launch].enabled = true)
+                .ExecuteOnExit(() => _states[PluginStates.Launch].enabled = false)
+                .On(PluginEvents.OnInit).Goto(PluginStates.Init)
+                .On(PluginEvents.OnLaunched).Goto(PluginStates.Launched)
+                .On(PluginEvents.OnFinish).Goto(PluginStates.Finish);
+
+            builder.In(PluginStates.Launched).ExecuteOnEntry(() => _states[PluginStates.Launched].enabled = true)
+                .ExecuteOnExit(() => _states[PluginStates.Launched].enabled = false)
+                .On(PluginEvents.OnFinish).Goto(PluginStates.Finish);
+
+            builder.In(PluginStates.Finish).ExecuteOnEntry(() =>
+            {
+                Clear();
+                ApplicationLauncher.Instance.RemoveModApplication(_button);
+                _sm.Stop();
+            });
+
+            _sm = builder.WithInitialState(PluginStates.Init).Build().CreatePassiveStateMachine();
+            _sm.AddExtension(new LogExtension());
+        }
+
+        private void Clear()
+        {
+            foreach (var component in _states.Values)
+            {
+                component.enabled = false;
+            }
+
+            gameObject
+                .TryToRemoveComponent<InitialStateSM>()
+                .TryToRemoveComponent<SettingsStateSM>()
+                .TryToRemoveComponent<SequenceStateFM>()
+                .TryToRemoveComponent<LaunchStateSM>()
+                .TryToRemoveComponent<LaunchedStateSM>();
+        }
     }
 }
